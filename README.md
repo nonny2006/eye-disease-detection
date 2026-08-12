@@ -19,15 +19,4 @@ Then: `venv\Scripts\Activate`
 
 If PowerShell blocks the activation with a script execution policy error (common on Windows), run this once first, then retry activating: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`
 
-Once activated, type into requirements.txt this:
-```
-tensorflow
-numpy
-pandas
-matplotlib
-seaborn
-scikit-learn
-pillow
-streamlit
-```
-Then run: `pip install -r requirements.txt`
+Once activated, run: `pip install -r requirements.txt`
