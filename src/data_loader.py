@@ -3,6 +3,7 @@ from PIL import Image
 import os
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # Where the dataset lives, and the four class folders we need to loop through
 DATA_DIR = "data/retina_dataset/dataset"
@@ -84,5 +85,56 @@ y_train_final = to_categorical(y_train_encoded, num_classes=4)
 y_val_final = to_categorical(y_val_encoded, num_classes=4)
 y_test_final = to_categorical(y_test_encoded, num_classes=4)
 
-print("Example label before encoding:", y_train[0])
-print("Example label after encoding:", y_train_final[0])
+# print("Example label before encoding:", y_train[0])
+# print("Example label after encoding:", y_train_final[0])
+
+# Only rotate/zoom/shift/horizontal-flip -- no vertical flip, since an
+# upside-down retina image isn't medically realistic
+augmenter = ImageDataGenerator(
+    rotation_range=15,
+    width_shift_range=0.1,
+    height_shift_range=0.1,
+    zoom_range=0.1,
+    horizontal_flip=True,
+    fill_mode="nearest"
+)
+
+# Classes that need extra augmented images to help balance the training set
+minority_classes = ["2_cataract", "2_glaucoma", "3_retina_disease"]
+
+def augment_minority_classes(X_train_images, y_train, target_multiplier=2):
+    """For each image belonging to a minority class in the training set,
+    generate additional augmented versions. Normal images pass through untouched."""
+    augmented_images = []
+    augmented_labels = []
+
+    for img, label in zip(X_train_images, y_train):
+        # always keep the original image
+        augmented_images.append(img)
+        augmented_labels.append(label)
+
+        if label in minority_classes:
+            img_expanded = np.expand_dims(img, axis=0)  # augmenter expects a batch, not a single image
+            aug_iter = augmenter.flow(img_expanded, batch_size=1)
+
+            for _ in range(target_multiplier - 1):
+                aug_img = next(aug_iter)[0]  # generate one augmented version
+                augmented_images.append(aug_img)
+                augmented_labels.append(label)
+
+    return np.array(augmented_images), augmented_labels
+
+X_train_augmented, y_train_augmented = augment_minority_classes(X_train_images, y_train)
+
+# from collections import Counter
+# print("Before augmentation:", Counter(y_train))
+# print("After augmentation:", Counter(y_train_augmented))
+
+# Re-encode labels for the augmented training set (it has more entries now
+# than the original y_train, so the old y_train_final no longer matches
+# X_train_augmented one-to-one)
+y_train_augmented_indexed = [label_to_index[label] for label in y_train_augmented]
+y_train_final = to_categorical(y_train_augmented_indexed, num_classes=4)
+
+print("X_train_augmented shape:", X_train_augmented.shape)
+print("y_train_final shape:", y_train_final.shape)
